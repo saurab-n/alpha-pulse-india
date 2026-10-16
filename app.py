@@ -34,30 +34,6 @@ st.markdown("""
         margin-bottom: 16px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
-    .verdict-short {
-        background-color: #F0FDF4;
-        border: 2px solid #86EFAC;
-        border-radius: 12px;
-        padding: 18px;
-    }
-    .verdict-long {
-        background-color: #EFF6FF;
-        border: 2px solid #93C5FD;
-        border-radius: 12px;
-        padding: 18px;
-    }
-    .good-news-box {
-        background-color: #FFFFFF;
-        border: 2px solid #86EFAC;
-        border-radius: 12px;
-        padding: 18px;
-    }
-    .bad-news-box {
-        background-color: #FFFFFF;
-        border: 2px solid #FCA5A5;
-        border-radius: 12px;
-        padding: 18px;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -208,6 +184,7 @@ sector_name = info.get("sector", "Industrials")
 currency = "Rs "
 
 pe_val = info.get("trailingPE")
+pe_float = float(pe_val) if pe_val is not None else None
 roe_val = float(info.get("returnOnEquity") or 0.0) * 100
 de_val = info.get("debtToEquity")
 rev_g_val = float(info.get("revenueGrowth") or 0.0) * 100
@@ -236,17 +213,15 @@ score_3_6m = sum([curr_price > sma50, curr_price > ema20, 50 <= rsi14 <= 72, mac
 score_1_2y = sum([roe_val >= 15, (de_val is None or de_val < 75), rev_g_val >= 8, curr_price > sma200, (insiders_pct + inst_pct) >= 45])
 
 # ==============================================================================
-# NEW SECTION: INSTITUTIONAL TECHNICAL TREND INDEX GRAPH (Motilal, Sharekhan, Jefferies)
+# SECTION: INSTITUTIONAL TECHNICAL TREND INDEX GRAPH
 # ==============================================================================
 st.markdown("### 📈 Institutional Technical Trend Index (Motilal Oswal, Sharekhan & Jefferies Consensus)")
 st.caption("Aggregated institutional trend indicator combining 50/200 DMA momentum, institutional volume flow, and broker target upgrades.")
 
 if not hist.empty and len(hist) >= 100:
-    # Build a normalized Trend Momentum Oscillator based on historical price relative to 50 & 200 DMA
     df_trend = hist.tail(120).copy()
     df_trend['MA50'] = df_trend['Close'].rolling(50).mean()
     df_trend['MA200'] = df_trend['Close'].rolling(200).mean()
-    # Institutional Trend Index score (0 to 100 scale)
     df_trend['Trend_Score'] = 50 + ((df_trend['Close'] - df_trend['MA50']) / df_trend['MA50'] * 50)
     df_trend['Trend_Score'] = df_trend['Trend_Score'].clip(10, 95)
 
@@ -257,7 +232,6 @@ if not hist.empty and len(hist) >= 100:
         line=dict(color='#0284C7', width=3),
         fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.1)'
     ))
-    # Add horizontal threshold lines for Bullish (>60) and Bearish (<40)
     fig_trend.add_hline(y=60, line_dash="dash", line_color="#22C55E", annotation_text="Strong Bullish Momentum Zone (Jefferies / Motilal Buy)", annotation_position="top left")
     fig_trend.add_hline(y=40, line_dash="dash", line_color="#EF4444", annotation_text="Bearish Caution Zone", annotation_position="bottom left")
     
@@ -319,7 +293,7 @@ with hero_c3:
 st.divider()
 
 # ==============================================================================
-# SECTION 1: 10-SECOND FUNDAMENTAL HEALTH CHECK (4 SIMPLE BADGES)
+# SECTION 1: 10-SECOND FUNDAMENTAL HEALTH CHECK
 # ==============================================================================
 st.markdown("### 1. 10-Second Fundamental Health Check")
 st.caption("Plain-English summary of business quality and safety for first-time readers.")
@@ -349,12 +323,13 @@ with b2:
     """, unsafe_allow_html=True)
 
 with b3:
-    pe_status = "Fair Price" if (pe_val and pe_val < 35) else "High P/E"
+    pe_status = "Fair Price" if (pe_float and pe_float < 35) else "High / N/A"
+    pe_str = f"{pe_float:.1f}x" if pe_float is not None else "N/A"
     st.markdown(f"""
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
         <div style="font-size:11px; color:#64748B; font-weight:700;">VALUATION</div>
         <div style="margin:6px 0;"><span style="background:#FEF9C3; color:#A16207; padding:3px 8px; border-radius:6px; font-weight:800; font-size:12px;">{pe_status}</span></div>
-        <div style="font-size:12px; color:#334155;">P/E ratio is {pe_val:.1f}x based on earnings</div>
+        <div style="font-size:12px; color:#334155;">P/E ratio is {pe_str} based on earnings</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -404,7 +379,7 @@ with col_bad:
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown(f"- **[Valuation Check]** P/E ratio of `{pe_val if pe_val else 'N/A'}` requires consistent earnings delivery to justify current prices.")
+    st.markdown(f"- **[Valuation Check]** P/E ratio of `{pe_str}` requires consistent earnings delivery to justify current prices.")
     st.markdown(f"- **[Macro Headwinds]** Global macroeconomic volatility can create short-term margin compression.")
     st.markdown(f"- **[Technical Resistance]** Shares face near-term supply zones if broader indices face profit booking.")
     
