@@ -9,7 +9,7 @@ import urllib.parse
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="AlphaPulse | Simple Stock Guide & Research",
+    page_title="AlphaPulse | Universal Stock Guide & Research",
     layout="wide",
     page_icon="📈"
 )
@@ -37,38 +37,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- POPULAR STOCKS & SECTOR PEERS ---
-POPULAR_STOCKS = {
-    "Tata Consultancy Services (TCS.NS)": "TCS.NS",
-    "Reliance Industries (RELIANCE.NS)": "RELIANCE.NS",
-    "Infosys (INFY.NS)": "INFY.NS",
-    "HDFC Bank (HDFCBANK.NS)": "HDFCBANK.NS",
-    "ICICI Bank (ICICIBANK.NS)": "ICICIBANK.NS",
-    "State Bank of India (SBIN.NS)": "SBIN.NS",
-    "Tata Motors (TATAMOTORS.NS)": "TATAMOTORS.NS",
-    "Mahindra & Mahindra (M&M.NS)": "M&M.NS",
-    "ITC Limited (ITC.NS)": "ITC.NS",
-    "Larsen & Toubro (LT.NS)": "LT.NS",
-    "Sun Pharma (SUNPHARMA.NS)": "SUNPHARMA.NS",
-    "Hindustan Aeronautics (HAL.NS)": "HAL.NS",
-    "Bajaj Finance (BAJFINANCE.NS)": "BAJFINANCE.NS",
-    "Bharti Airtel (BHARTIARTL.NS)": "BHARTIARTL.NS",
-    "Zomato / Eternal (ZOMATO.NS)": "ZOMATO.NS",
-    "Custom NSE Ticker (Type Below)": "CUSTOM"
-}
-
-SECTOR_PEERS_MAP = {
-    "Technology": ["TCS.NS", "INFY.NS", "HCLTECH.NS", "WIPRO.NS", "TECHM.NS", "LTIM.NS"],
-    "Financial Services": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "AXISBANK.NS", "KOTAKBANK.NS", "BAJFINANCE.NS"],
-    "Consumer Cyclical": ["TATAMOTORS.NS", "M&M.NS", "MARUTI.NS", "BAJAJ-AUTO.NS", "TRENT.NS", "TITAN.NS"],
-    "Consumer Defensive": ["ITC.NS", "HINDUNILVR.NS", "NESTLEIND.NS", "BRITANNIA.NS", "TATACONSUM.NS"],
-    "Energy": ["RELIANCE.NS", "ONGC.NS", "NTPC.NS", "POWERGRID.NS", "COALINDIA.NS", "TATAPOWER.NS"],
-    "Industrials": ["LT.NS", "HAL.NS", "BEL.NS", "SIEMENS.NS", "ABB.NS", "ADANIPORTS.NS"],
-    "Healthcare": ["SUNPHARMA.NS", "CIPLA.NS", "DRREDDY.NS", "DIVISLAB.NS", "APOLLOHOSP.NS"],
-    "Communication Services": ["BHARTIARTL.NS", "INDUSINDBK.NS", "IDEA.NS", "TATACOMM.NS"],
-    "Basic Materials": ["TATASTEEL.NS", "JSWSTEEL.NS", "HINDALCO.NS", "ULTRACEMCO.NS", "GRASIM.NS"]
-}
-
 TOP_BROKERS = [
     {"Firm": "Motilal Oswal Financial Services", "SEBI Reg": "INH000000412", "Stance": "Bullish Accumulation"},
     {"Firm": "ICICI Securities (ICICI Direct)", "SEBI Reg": "INH000000990", "Stance": "Outperformer"},
@@ -78,20 +46,26 @@ TOP_BROKERS = [
     {"Firm": "Sharekhan by BNP Paribas", "SEBI Reg": "INH000000303", "Stance": "Momentum Buy"}
 ]
 
-# --- TOP NAVIGATION BAR ---
+# --- UNIVERSAL SEARCH BAR (FREE TEXT INPUT FOR ANY STOCK) ---
 col_head1, col_head2, col_head3 = st.columns([1.5, 4, 1.5])
 with col_head1:
     st.markdown("### 📊 AlphaPulse")
 with col_head2:
-    selected_label = st.selectbox("Search Stock:", list(POPULAR_STOCKS.keys()), label_visibility="collapsed")
+    user_input = st.text_input(
+        "Search Stock Ticker:", 
+        value="TCS.NS", 
+        type="default", 
+        placeholder="Type any ticker e.g. RELIANCE.NS, INFY.NS, AAPL, NVDA..."
+    )
 with col_head3:
-    st.caption("Retail Investor Guide")
+    st.caption("Universal Search & Guide")
 
-if POPULAR_STOCKS[selected_label] == "CUSTOM":
-    raw_ticker = st.text_input("Enter NSE Ticker (e.g. TATAPOWER, WIPRO, IRCTC):", "TATAPOWER").strip().upper()
-    ticker = f"{raw_ticker}.NS" if (not raw_ticker.endswith((".NS", ".BO")) and len(raw_ticker) > 0) else raw_ticker
+# Clean and format user input ticker
+raw_search = user_input.strip().upper() if user_input else "TCS.NS"
+if not raw_search.endswith((".NS", ".BO", ".US")) and "." not in raw_search and len(raw_search) <= 6 and not raw_search.startswith("^"):
+    ticker = f"{raw_search}.NS"
 else:
-    ticker = POPULAR_STOCKS[selected_label]
+    ticker = raw_search
 
 st.divider()
 
@@ -147,11 +121,9 @@ def fetch_live_news(company_name, symbol, query_suffix="stock NSE news"):
 
 @st.cache_data(ttl=1800)
 def fetch_peer_comparison(main_ticker, sector_name):
-    peer_list = SECTOR_PEERS_MAP.get(sector_name, ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ITC.NS"])
-    if main_ticker not in peer_list:
-        peer_list = [main_ticker] + peer_list[:5]
+    default_peers = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ITC.NS"]
     rows = []
-    for sym in peer_list:
+    for sym in default_peers:
         try:
             inf = yf.Ticker(sym).info or {}
             pe = inf.get("trailingPE")
@@ -159,7 +131,6 @@ def fetch_peer_comparison(main_ticker, sector_name):
             de = inf.get("debtToEquity")
             rev_g = inf.get("revenueGrowth")
             op_m = inf.get("operatingMargins")
-            mcap = to_crores(inf.get("marketCap"))
             rows.append({
                 "Company": (inf.get("shortName") or sym.replace(".NS",""))[:20],
                 "Price (Rs)": round(float(inf.get("currentPrice") or inf.get("regularMarketPrice") or 0), 1),
@@ -173,15 +144,19 @@ def fetch_peer_comparison(main_ticker, sector_name):
             continue
     return pd.DataFrame(rows)
 
-# --- LOAD DATA ---
-with st.spinner(f"Analyzing {ticker} for retail investors..."):
+# --- LOAD DATA FOR SEARCHED TICKER ---
+with st.spinner(f"Fetching live data & analysis for `{ticker}`..."):
     info, hist, q_income = load_stock_bundle(ticker)
 
-company_name = info.get("longName") or info.get("shortName") or ticker.replace(".NS", "")
+if hist.empty or len(hist) < 30:
+    st.error(f"⚠️ Could not fetch valid price data for ticker **`{ticker}`**. Please verify the ticker symbol (e.g., use `RELIANCE.NS` for NSE India or `AAPL` for US stocks).")
+    st.stop()
+
+company_name = info.get("longName") or info.get("shortName") or ticker
 raw_price = info.get("currentPrice") or info.get("regularMarketPrice") or (float(hist['Close'].iloc[-1]) if not hist.empty else 0.0)
 curr_price = float(raw_price) if raw_price else 0.0
-sector_name = info.get("sector", "Industrials")
-currency = "Rs "
+sector_name = info.get("sector", "General")
+currency = "Rs " if ticker.endswith((".NS", ".BO")) else "$"
 
 pe_val = info.get("trailingPE")
 pe_float = float(pe_val) if pe_val is not None else None
@@ -193,35 +168,28 @@ inst_pct = round(float(info.get("heldPercentInstitutions") or 0.0) * 100, 2)
 target_mean = info.get("targetMeanPrice")
 
 # Technicals
-if not hist.empty and len(hist) >= 200:
-    close_s = hist['Close']
-    ema20 = float(ta.trend.EMAIndicator(close_s, window=20).ema_indicator().iloc[-1])
-    sma50 = float(ta.trend.SMAIndicator(close_s, window=50).sma_indicator().iloc[-1])
-    sma200 = float(ta.trend.SMAIndicator(close_s, window=200).sma_indicator().iloc[-1])
-    rsi14 = float(ta.momentum.RSIIndicator(close_s, window=14).rsi().iloc[-1])
-    macd_l = float(ta.trend.MACD(close_s).macd().iloc[-1])
-    macd_s = float(ta.trend.MACD(close_s).macd_signal().iloc[-1])
-    atr14 = float(ta.volatility.AverageTrueRange(hist['High'], hist['Low'], close_s, window=14).average_true_range().iloc[-1])
-    ret_3m = float((curr_price / float(close_s.iloc[-63]) - 1) * 100) if len(close_s) > 63 else 0.0
-else:
-    ema20 = sma50 = sma200 = curr_price
-    rsi14 = 50.0
-    macd_l = macd_s = atr14 = 1.0
-    ret_3m = 0.0
+close_s = hist['Close']
+ema20 = float(ta.trend.EMAIndicator(close_s, window=20).ema_indicator().iloc[-1])
+sma50 = float(ta.trend.SMAIndicator(close_s, window=50).sma_indicator().iloc[-1])
+sma200 = float(ta.trend.SMAIndicator(close_s, window=200).sma_indicator().iloc[-1]) if len(close_s) >= 200 else sma50
+rsi14 = float(ta.momentum.RSIIndicator(close_s, window=14).rsi().iloc[-1])
+macd_l = float(ta.trend.MACD(close_s).macd().iloc[-1])
+macd_s = float(ta.trend.MACD(close_s).macd_signal().iloc[-1])
+atr14 = float(ta.volatility.AverageTrueRange(hist['High'], hist['Low'], close_s, window=14).average_true_range().iloc[-1])
+ret_3m = float((curr_price / float(close_s.iloc[-63]) - 1) * 100) if len(close_s) > 63 else 0.0
 
 score_3_6m = sum([curr_price > sma50, curr_price > ema20, 50 <= rsi14 <= 72, macd_l >= macd_s, rev_g_val > 5])
-score_1_2y = sum([roe_val >= 15, (de_val is None or de_val < 75), rev_g_val >= 8, curr_price > sma200, (insiders_pct + inst_pct) >= 45])
+score_1_2y = sum([roe_val >= 15, (de_val is None or de_val < 75), rev_g_val >= 8, curr_price > sma200, (insiders_pct + inst_pct) >= 40])
 
 # ==============================================================================
 # SECTION: INSTITUTIONAL TECHNICAL TREND INDEX GRAPH
 # ==============================================================================
-st.markdown("### 📈 Institutional Technical Trend Index (Motilal Oswal, Sharekhan & Jefferies Consensus)")
-st.caption("Aggregated institutional trend indicator combining 50/200 DMA momentum, institutional volume flow, and broker target upgrades.")
+st.markdown(f"### 📈 Institutional Technical Trend Index: **{company_name}** (`{ticker}`)")
+st.caption("Aggregated institutional trend indicator combining moving average momentum, volume flow, and broker consensus.")
 
-if not hist.empty and len(hist) >= 100:
+if len(hist) >= 60:
     df_trend = hist.tail(120).copy()
-    df_trend['MA50'] = df_trend['Close'].rolling(50).mean()
-    df_trend['MA200'] = df_trend['Close'].rolling(200).mean()
+    df_trend['MA50'] = df_trend['Close'].rolling(min_periods=10, window=50).mean()
     df_trend['Trend_Score'] = 50 + ((df_trend['Close'] - df_trend['MA50']) / df_trend['MA50'] * 50)
     df_trend['Trend_Score'] = df_trend['Trend_Score'].clip(10, 95)
 
@@ -232,7 +200,7 @@ if not hist.empty and len(hist) >= 100:
         line=dict(color='#0284C7', width=3),
         fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.1)'
     ))
-    fig_trend.add_hline(y=60, line_dash="dash", line_color="#22C55E", annotation_text="Strong Bullish Momentum Zone (Jefferies / Motilal Buy)", annotation_position="top left")
+    fig_trend.add_hline(y=60, line_dash="dash", line_color="#22C55E", annotation_text="Strong Bullish Momentum Zone", annotation_position="top left")
     fig_trend.add_hline(y=40, line_dash="dash", line_color="#EF4444", annotation_text="Bearish Caution Zone", annotation_position="bottom left")
     
     fig_trend.update_layout(
@@ -243,8 +211,6 @@ if not hist.empty and len(hist) >= 100:
         template="plotly_white"
     )
     st.plotly_chart(fig_trend, use_container_width=True)
-else:
-    st.info("Technical trend history loading...")
 
 st.divider()
 
@@ -255,11 +221,11 @@ hero_c1, hero_c2, hero_c3 = st.columns([1.1, 1, 1])
 
 with hero_c1:
     st.markdown(f"### **{company_name}**")
-    st.caption(f"Sector: {sector_name} • NSE Ticker: `{ticker}`")
+    st.caption(f"Sector: {sector_name} • Ticker: `{ticker}`")
     st.markdown(f"<h2 style='margin:0; color:#0F172A;'>{fmt_price(curr_price, currency)}</h2>", unsafe_allow_html=True)
     st.markdown(f"<span style='color: {'#15803D' if ret_3m >= 0 else '#B91C1C'}; font-weight:700;'>{ret_3m:+.1f}% in 3M</span>", unsafe_allow_html=True)
     target_str = fmt_price(target_mean, currency)
-    st.markdown(f"<div style='font-size:12px; color:#475569; margin-top:6px;'>SEBI Broker Consensus Target: <b>{target_str}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:12px; color:#475569; margin-top:6px;'>Consensus Target: <b>{target_str}</b></div>", unsafe_allow_html=True)
 
 with hero_c2:
     st.markdown("""
@@ -281,7 +247,7 @@ with hero_c3:
     <div style="background-color:#EFF6FF; border:2px solid #93C5FD; border-radius:12px; padding:16px;">
         <div style="font-size:11px; font-weight:800; color:#1E40AF; text-transform:uppercase;">Long-Term (1–2 Years)</div>
         <div style="font-size:17px; font-weight:800; color:#1D4ED8; margin:4px 0;">{}</div>
-        <div style="font-size:12px; color:#334155;">{} of 5 Safety & ROE Checks Passed</div>
+        <div style="font-size:12px; color:#334155;">{} of 5 Safety Checks Passed</div>
         <div style="font-size:11px; color:#1D4ED8; font-weight:700; margin-top:6px;">Safe Dip Zone: {}</div>
     </div>
     """.format(
@@ -307,7 +273,7 @@ with b1:
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
         <div style="font-size:11px; color:#64748B; font-weight:700;">PROFITABILITY</div>
         <div style="margin:6px 0;"><span style="background:{roe_color_bg}; color:{roe_color_txt}; padding:3px 8px; border-radius:6px; font-weight:800; font-size:12px;">{roe_status}</span></div>
-        <div style="font-size:12px; color:#334155;">Earns Rs {roe_val:.0f} on every Rs 100 invested (ROE)</div>
+        <div style="font-size:12px; color:#334155;">ROE is {roe_val:.1f}%</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -318,7 +284,7 @@ with b2:
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
         <div style="font-size:11px; color:#64748B; font-weight:700;">DEBT & SAFETY</div>
         <div style="margin:6px 0;"><span style="background:{debt_color_bg}; color:{debt_color_txt}; padding:3px 8px; border-radius:6px; font-weight:800; font-size:12px;">{debt_status}</span></div>
-        <div style="font-size:12px; color:#334155;">Low financial risk & strong cash reserves</div>
+        <div style="font-size:12px; color:#334155;">Financial leverage check</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -329,24 +295,24 @@ with b3:
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
         <div style="font-size:11px; color:#64748B; font-weight:700;">VALUATION</div>
         <div style="margin:6px 0;"><span style="background:#FEF9C3; color:#A16207; padding:3px 8px; border-radius:6px; font-weight:800; font-size:12px;">{pe_status}</span></div>
-        <div style="font-size:12px; color:#334155;">P/E ratio is {pe_str} based on earnings</div>
+        <div style="font-size:12px; color:#334155;">P/E ratio is {pe_str}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with b4:
-    owner_status = f"{insiders_pct + inst_pct:.0f}% Locked" if (insiders_pct + inst_pct) > 40 else "Moderate"
+    owner_status = f"{insiders_pct + inst_pct:.0f}% Locked" if (insiders_pct + inst_pct) > 30 else "Moderate"
     st.markdown(f"""
     <div style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:10px; padding:14px;">
         <div style="font-size:11px; color:#64748B; font-weight:700;">OWNER TRUST</div>
         <div style="margin:6px 0;"><span style="background:#DCFCE7; color:#15803D; padding:3px 8px; border-radius:6px; font-weight:800; font-size:12px;">{owner_status}</span></div>
-        <div style="font-size:12px; color:#334155;">Promoters & Mutual Funds holding</div>
+        <div style="font-size:12px; color:#334155;">Promoters & Mutual Funds</div>
     </div>
     """, unsafe_allow_html=True)
 
 st.divider()
 
 # ==============================================================================
-# SECTION 2: GOOD NEWS & POSITIVE TRIGGERS VS BAD NEWS & WATCHOUT RISKS
+# SECTION 2: GOOD NEWS & BAD NEWS
 # ==============================================================================
 st.markdown("### 2. Stock News & Triggers: The Good vs. The Bad")
 st.caption("Automatically sorted into positive catalysts and watchout risk factors.")
@@ -357,14 +323,11 @@ with col_good:
     st.markdown("""
     <div style="background:#FFFFFF; border:2px solid #86EFAC; border-radius:12px; padding:18px;">
         <div style="background:#F0FDF4; padding:8px 12px; border-radius:8px; margin-bottom:12px;">
-            <span style="color:#15803D; font-weight:800; font-size:13px;">🟢 GOOD NEWS & POSITIVE CATALYSTS (Why It Can Go Up)</span>
+            <span style="color:#15803D; font-weight:800; font-size:13px;">🟢 GOOD NEWS & POSITIVE CATALYSTS</span>
         </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown(f"- **[Earnings Momentum]** Return on Equity stands at a strong **{roe_val:.1f}%**, signaling robust capital efficiency.")
-    st.markdown(f"- **[Balance Sheet]** Debt-to-Equity is safely manageable, reducing bankruptcy risk during market downturns.")
-    st.markdown(f"- **[Institutional Backing]** Motilal Oswal & Jefferies highlight strong structural growth in this sector.")
-    
+    st.markdown(f"- **[Capital Efficiency]** Return on Equity is solid at **{roe_val:.1f}%**.")
+    st.markdown(f"- **[Trend Support]** Price action relative to key moving averages shows active institutional participation.")
     live_news_good = fetch_live_news(company_name, ticker, query_suffix="growth expansion order win profit")
     if live_news_good:
         for item in live_news_good[:2]:
@@ -375,14 +338,11 @@ with col_bad:
     st.markdown("""
     <div style="background:#FFFFFF; border:2px solid #FCA5A5; border-radius:12px; padding:18px;">
         <div style="background:#FEF2F2; padding:8px 12px; border-radius:8px; margin-bottom:12px;">
-            <span style="color:#B91C1C; font-weight:800; font-size:13px;">🔴 BAD NEWS & WATCHOUT RISKS (What To Be Careful About)</span>
+            <span style="color:#B91C1C; font-weight:800; font-size:13px;">🔴 BAD NEWS & WATCHOUT RISKS</span>
         </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown(f"- **[Valuation Check]** P/E ratio of `{pe_str}` requires consistent earnings delivery to justify current prices.")
-    st.markdown(f"- **[Macro Headwinds]** Global macroeconomic volatility can create short-term margin compression.")
-    st.markdown(f"- **[Technical Resistance]** Shares face near-term supply zones if broader indices face profit booking.")
-    
+    st.markdown(f"- **[Valuation Watch]** P/E ratio is `{pe_str}`; requires steady earnings delivery.")
+    st.markdown(f"- **[Market Volatility]** Broad market swings can impact short-term momentum.")
     live_news_bad = fetch_live_news(company_name, ticker, query_suffix="risk slowdown pressure warning")
     if live_news_bad:
         for item in live_news_bad[:2]:
@@ -392,7 +352,7 @@ with col_bad:
 st.divider()
 
 # ==============================================================================
-# SECTION 3: FINANCIAL STATEMENTS EXPLAINED LIKE A FAMILY BUDGET
+# SECTION 3: FINANCIAL STATEMENTS EXPLAINED
 # ==============================================================================
 st.markdown("### 3. Financial Statements Explained Like a Family Budget")
 st.caption("Zero accounting jargon — built for first-time readers.")
@@ -412,7 +372,7 @@ with col_fin1:
             r_now = to_crores(q_income.loc[rev_key, q_cols[0]])
             p_now = to_crores(q_income.loc[prof_key, q_cols[0]])
             profit_margin = (p_now / r_now * 100) if (r_now and p_now and r_now > 0) else 0.0
-            st.markdown(f"* **Latest Sales (Revenue):** `Rs {r_now:,.1f} Crore`")
+            st.markdown(f"* **Latest Sales:** `Rs {r_now:,.1f} Crore`")
             st.markdown(f"* **Take-Home Profit:** `Rs {p_now:,.1f} Crore`")
             st.success(f"**Beginner Takeaway:** For every Rs 100 of sales, the company keeps **Rs {profit_margin:.1f}** as pure profit!")
     else:
@@ -430,9 +390,9 @@ with col_fin2:
         st.markdown(f"* **Cash in Bank:** `Rs {total_cash:,.0f} Crore`")
         st.markdown(f"* **Total Borrowings:** `Rs {total_debt:,.0f} Crore`")
         if total_cash >= total_debt:
-            st.success("**Beginner Takeaway:** Cash savings exceed total loans. Fortress balance sheet with zero bankruptcy risk!")
+            st.success("**Beginner Takeaway:** Cash savings exceed total loans. Fortress balance sheet!")
         else:
-            st.warning("**Beginner Takeaway:** Loan liabilities are higher than cash reserves. Review debt service coverage.")
+            st.warning("**Beginner Takeaway:** Loan liabilities are higher than cash reserves.")
     else:
         st.info("Standard corporate debt metrics do not apply to Banks/Financial institutions.")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -440,20 +400,18 @@ with col_fin2:
 st.divider()
 
 # ==============================================================================
-# SECTION 4: EXPANDABLE DEEP-DIVES (ZERO CLUTTER)
+# SECTION 4: EXPANDABLE DEEP-DIVES
 # ==============================================================================
 st.markdown("### 4. Want Deeper Details? Click Any Box Below to Expand")
 
-with st.expander(f"⚔️ Compare {company_name} with Sector Rivals (Peer Comparison Table)"):
-    st.caption("Inspecting how this stock compares against top industry competitors.")
+with st.expander(f"⚔️ Compare {company_name} with Sector Rivals (Peer Comparison)"):
+    st.markdown("Inspecting how this stock compares against top industry benchmarks.")
     df_peers = fetch_peer_comparison(ticker, sector_name)
     if not df_peers.empty:
         st.dataframe(df_peers, use_container_width=True, hide_index=True)
-    else:
-        st.info("Peer comparison data loading...")
 
 with st.expander("🏛️ View Top SEBI-Registered Broker Targets & Consensus Meter"):
-    st.caption("Directory of top research houses (Motilal Oswal, ICICI Direct, Kotak, Jefferies, Sharekhan).")
+    st.markdown("Directory of top research houses (Motilal Oswal, ICICI Direct, Kotak, Jefferies, Sharekhan).")
     st.dataframe(pd.DataFrame(TOP_BROKERS), use_container_width=True, hide_index=True)
 
 with st.expander("📈 Open Interactive Technical Price Chart (20 EMA, 50 & 200 SMA)"):
